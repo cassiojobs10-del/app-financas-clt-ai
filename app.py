@@ -29,7 +29,7 @@ TABELA_IRRF = [
 
 DEDUCAO_POR_DEPENDENTE = 189.59
 
-def calcular_clt(salario_bruto, jornada, dependentes):
+def calcular_clt(salario_bruto, jornada, dependentes, aplicar_irrf=True):
     # Cálculo do INSS
     inss = 0.0
     for f in TABELA_INSS:
@@ -40,15 +40,16 @@ def calcular_clt(salario_bruto, jornada, dependentes):
             break
     inss = round(inss, 2)
 
-    # Cálculo do IRRF
-    base_irrf = salario_bruto - inss - (dependentes * DEDUCAO_POR_DEPENDENTE)
+    # Cálculo do IRRF (Somente se ativado pelo usuário)
     irrf = 0.0
-    if base_irrf > 0:
-        for f in TABELA_IRRF:
-            if f["piso"] < base_irrf <= f["teto"]:
-                irrf = max(0.0, (base_irrf * f["aliquota"]) - f["deducao"])
-                break
-    irrf = round(irrf, 2)
+    if aplicar_irrf:
+        base_irrf = salario_bruto - inss - (dependentes * DEDUCAO_POR_DEPENDENTE)
+        if base_irrf > 0:
+            for f in TABELA_IRRF:
+                if f["piso"] < base_irrf <= f["teto"]:
+                    irrf = max(0.0, (base_irrf * f["aliquota"]) - f["deducao"])
+                    break
+        irrf = round(irrf, 2)
 
     salario_liquido = round(salario_bruto - inss - irrf, 2)
     hora_liquida = round(salario_liquido / jornada, 2) if jornada > 0 else 0.0
@@ -65,17 +66,22 @@ st.divider()
 
 # --- SEÇÃO 1: PERFIL TRABALHISTA ---
 st.subheader("1. Configure sua Renda")
-col1, col2, col3 = st.columns(3)
 
+col1, col2 = st.columns(2)
 with col1:
     salario_bruto = st.number_input("Salário Bruto (R$)", min_value=1000.0, value=4500.0, step=100.0)
 with col2:
     jornada = st.selectbox("Jornada Mensal (Horas)", options=[220, 180, 160], index=0)
+
+col3, col4 = st.columns(2)
 with col3:
     dependentes = st.number_input("Dependentes", min_value=0, value=0, step=1)
+with col4:
+    st.write("") # Espaçamento visual
+    aplicar_irrf = st.toggle("Descontar IRRF na fonte?", value=True, help="Desative caso você seja isento ou não tenha desconto de Imposto de Renda retido na folha.")
 
 # Executando o cálculo instantâneo
-sal_liquido, inss, irrf, hora_liq = calcular_clt(salario_bruto, jornada, dependentes)
+sal_liquido, inss, irrf, hora_liq = calcular_clt(salario_bruto, jornada, dependentes, aplicar_irrf)
 
 st.divider()
 
@@ -88,7 +94,10 @@ with card1:
 with card2:
     st.metric("Desconto INSS", f"R$ {inss:,.2f}")
 with card3:
-    st.metric("Desconto IRRF", f"R$ {irrf:,.2f}")
+    if aplicar_irrf:
+        st.metric("Desconto IRRF", f"R$ {irrf:,.2f}")
+    else:
+        st.metric("Desconto IRRF", "R$ 0,00", delta="Isento / Não aplicado", delta_color="off")
 
 st.divider()
 
