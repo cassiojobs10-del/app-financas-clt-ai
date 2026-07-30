@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# LÓGICA DE CÁLCULO (TABELAS DE IMPOSTOS)
+# LÓGICA DE CÁLCULO (TABELAS DE IMPOSTOS - CLT)
 # ==========================================
 TABELA_INSS = [
     {"piso": 0.00, "teto": 1412.00, "aliquota": 0.075},
@@ -30,16 +30,14 @@ TABELA_IRRF = [
 DEDUCAO_POR_DEPENDENTE = 189.59
 
 def calcular_clt(salario_base, jornada, dependentes, aplicar_irrf=True, horas_50=0.0, horas_100=0.0):
-    # 1. Cálculo da hora normal e horas extras
     hora_normal = salario_base / jornada if jornada > 0 else 0.0
     valor_he_50 = round(horas_50 * (hora_normal * 1.5), 2)
     valor_he_100 = round(horas_100 * (hora_normal * 2.0), 2)
     total_horas_extras = round(valor_he_50 + valor_he_100, 2)
     
-    # Salário bruto total para base de impostos
     salario_bruto_total = round(salario_base + total_horas_extras, 2)
 
-    # 2. Cálculo do INSS
+    # INSS Progressivo
     inss = 0.0
     for f in TABELA_INSS:
         if salario_bruto_total > f["piso"]:
@@ -49,7 +47,7 @@ def calcular_clt(salario_base, jornada, dependentes, aplicar_irrf=True, horas_50
             break
     inss = round(inss, 2)
 
-    # 3. Cálculo do IRRF
+    # IRRF Opcional
     irrf = 0.0
     if aplicar_irrf:
         base_irrf = salario_bruto_total - inss - (dependentes * DEDUCAO_POR_DEPENDENTE)
@@ -60,7 +58,6 @@ def calcular_clt(salario_base, jornada, dependentes, aplicar_irrf=True, horas_50
                     break
         irrf = round(irrf, 2)
 
-    # 4. Salário líquido final e valor da hora trabalhada real
     salario_liquido = round(salario_bruto_total - inss - irrf, 2)
     jornada_total_real = jornada + horas_50 + horas_100
     hora_liquida = round(salario_liquido / jornada_total_real, 2) if jornada_total_real > 0 else 0.0
@@ -78,7 +75,7 @@ def calcular_clt(salario_base, jornada, dependentes, aplicar_irrf=True, horas_50
 # INTERFACE VISUAL (TELAS DO APP)
 # ==========================================
 st.title("💰 Meu Controle Financeiro & CLT")
-st.write("Entenda seu ganho real e descubra quanto custam seus gastos em **tempo de vida trabalhado**.")
+st.write("Entenda seu ganho real, controle seus gastos e descubra seu **Dinheiro Livre** no mês.")
 
 st.divider()
 
@@ -95,20 +92,19 @@ col3, col4 = st.columns(2)
 with col3:
     dependentes = st.number_input("Dependentes", min_value=0, value=0, step=1)
 with col4:
-    st.write("") # Espaçamento visual
+    st.write("")
     aplicar_irrf = st.toggle("Descontar IRRF na fonte?", value=True)
 
-# Painel expansível para Horas Extras (não polui a tela principal)
 horas_50, horas_100 = 0.0, 0.0
 with st.expander("➕ Adicionar Horas Extras no Mês (Opcional)"):
     st.write("Informe a quantidade de horas extras realizadas:")
     col_he1, col_he2 = st.columns(2)
     with col_he1:
-        horas_50 = st.number_input("Horas Extras 50% (Qtd)", min_value=0.0, value=0.0, step=1.0, help="Horas extras em dias normais de trabalho.")
+        horas_50 = st.number_input("Horas Extras 50% (Qtd)", min_value=0.0, value=0.0, step=1.0)
     with col_he2:
-        horas_100 = st.number_input("Horas Extras 100% (Qtd)", min_value=0.0, value=0.0, step=1.0, help="Horas extras em domingos ou feriados.")
+        horas_100 = st.number_input("Horas Extras 100% (Qtd)", min_value=0.0, value=0.0, step=1.0)
 
-# Executando o cálculo instantâneo
+# Cálculo CLT
 folha = calcular_clt(salario_base, jornada, dependentes, aplicar_irrf, horas_50, horas_100)
 
 st.divider()
@@ -116,12 +112,10 @@ st.divider()
 # --- SEÇÃO 2: RAIO-X DO SALÁRIO ---
 st.subheader("2. Seu Salário Real (Líquido)")
 
-# Se houver horas extras, exibe um aviso em destaque com o valor extra ganho
 if folha["total_horas_extras"] > 0:
     st.success(f"📈 **Salário Bruto com Horas Extras:** R$ {folha['salario_bruto_total']:,.2f} *(+ R$ {folha['total_horas_extras']:,.2f} em extras)*")
 
 card1, card2, card3 = st.columns(3)
-
 with card1:
     st.metric(
         label="Salário Líquido",
@@ -143,7 +137,6 @@ st.subheader("⏱️ Termômetro de Gastos: Custo em Horas de Vida")
 st.write("Antes de fazer uma compra, descubra quanto tempo de trabalho líquido ela vai custar:")
 
 col_gasto1, col_gasto2 = st.columns([1, 2])
-
 with col_gasto1:
     valor_compra = st.number_input("Valor da despesa (R$)", min_value=1.0, value=150.0, step=10.0)
 
@@ -155,3 +148,52 @@ with col_gasto2:
         
         st.info(f"💡 Para comprar algo de **R$ {valor_compra:,.2f}**, você precisará trabalhar exatamente:")
         st.header(f"⏳ **{horas} horas e {minutos} minutos**")
+
+st.divider()
+
+# --- SEÇÃO 4: GESTÃO DE GASTOS & DINHEIRO LIVRE ---
+st.subheader("4. Controle de Gastos e 'Dinheiro Livre'")
+st.write("Registre suas despesas para descobrir quanto do seu salário líquido sobra limpo no final do mês:")
+
+col_fixo, col_var = st.columns(2)
+
+with col_fixo:
+    st.markdown("#### 🔒 Gastos Fixos")
+    moradia = st.number_input("Aluguel / Financiamento / Condomínio", min_value=0.0, value=1200.0, step=50.0)
+    contas = st.number_input("Contas Básicas (Luz, Água, Internet)", min_value=0.0, value=300.0, step=20.0)
+    transporte = st.number_input("Transporte / Combustível", min_value=0.0, value=350.0, step=20.0)
+    outros_fixos = st.number_input("Outros Fixos (Saúde, Educação, etc.)", min_value=0.0, value=200.0, step=20.0)
+
+with col_var:
+    st.markdown("#### 🛍️ Gastos Variáveis")
+    alimentacao = st.number_input("Alimentação Fora / Delivery", min_value=0.0, value=400.0, step=20.0)
+    lazer = st.number_input("Lazer e Assinaturas", min_value=0.0, value=250.0, step=20.0)
+    compras = st.number_input("Compras / Imprevistos", min_value=0.0, value=300.0, step=20.0)
+
+# Cálculos de Total e Saldo Livre
+total_fixo = round(moradia + contas + transporte + outros_fixos, 2)
+total_var = round(alimentacao + lazer + compras, 2)
+total_gastos = round(total_fixo + total_var, 2)
+dinheiro_livre = round(folha["salario_liquido"] - total_gastos, 2)
+
+st.write("") # Espaçamento
+
+# Exibição do Balanço Mensal
+m_card1, m_card2, m_card3 = st.columns(3)
+with m_card1:
+    st.metric("Total de Custos Fixos", f"R$ {total_fixo:,.2f}")
+with m_card2:
+    st.metric("Total de Custos Variáveis", f"R$ {total_var:,.2f}")
+with m_card3:
+    if dinheiro_livre >= 0:
+        st.metric("💵 Dinheiro Livre (Sobra)", f"R$ {dinheiro_livre:,.2f}", delta="Saldo Positivo")
+    else:
+        st.metric("🚨 Dinheiro Livre (Sobra)", f"R$ {dinheiro_livre:,.2f}", delta="Orçamento Estourado", delta_color="inverse")
+
+# Barra de Alerta de Consumo da Renda
+if folha["salario_liquido"] > 0:
+    percentual_gasto = min(1.0, total_gastos / folha["salario_liquido"])
+    percentual_exibicao = round((total_gastos / folha["salario_liquido"]) * 100, 1)
+    
+    st.write(f"**Comprometimento da Renda:** Você já comprometeu **{percentual_exibicao}%** do seu salário líquido deste mês.")
+    st.progress(percentual_gasto)
